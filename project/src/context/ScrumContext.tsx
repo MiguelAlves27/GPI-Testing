@@ -34,6 +34,17 @@ export interface Sprint {
   status: 'Planned' | 'In Progress' | 'Completed';
 }
 
+export interface Project {
+  id: string;
+  title: string;
+  description: string;
+  startDate: string;
+  estimatedDuration: number; // in weeks
+  sprintDuration: number; // in weeks
+  createdAt: string;
+  status: 'Active' | 'Completed' | 'On Hold';
+}
+
 interface ScrumContextType {
   tasks: Task[];
   stories: Story[];
@@ -67,6 +78,7 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [tasks, setTasks] = useState<Task[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
   const [sprints, setSprints] = useState<Sprint[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
 
   /**
    * Fetch tasks from Supabase on component mount
@@ -95,11 +107,22 @@ export const ScrumProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     else setStories(data || []);
   };
 
+    /**
+   * Fetch projects from Supabase
+   */
+  const fetchProjects = async () => {
+    const { data, error } = await supabase.from('projects').select('*');
+    if (error) console.error('Error fetching projects:', error);
+    else setProjects(data || []);
+  };
+
+
   // Fetch all data from Supabase when app loads, populates the context of the APP
   useEffect(() => {
     fetchTasks();
     fetchSprints();
     fetchStories();
+    fetchProjects();
   }, []);
             
             // CRUD Operations for Tasks

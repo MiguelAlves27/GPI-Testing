@@ -78,6 +78,19 @@ CREATE TABLE IF NOT EXISTS tasks (
   createdAt timestamptz DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS projects (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  description text,
+  created_at timestamptz DEFAULT now(),
+  created_by uuid REFERENCES auth.users(id)
+);
+
+-- Add project_id to existing tables
+ALTER TABLE stories ADD COLUMN IF NOT EXISTS project_id uuid REFERENCES projects(id) ON DELETE CASCADE;
+ALTER TABLE sprints ADD COLUMN IF NOT EXISTS project_id uuid REFERENCES projects(id) ON DELETE CASCADE;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS project_id uuid REFERENCES projects(id) ON DELETE CASCADE;
+
 -- Enable Row Level Security (RLS)
 ALTER TABLE stories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sprints ENABLE ROW LEVEL SECURITY;
