@@ -82,8 +82,8 @@ CREATE TABLE IF NOT EXISTS projects (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL,
   description text,
-  created_at timestamptz DEFAULT now(),
-  created_by uuid REFERENCES auth.users(id)
+  createdAt timestamptz DEFAULT now(),
+  createdBy uuid REFERENCES auth.users(id)
 );
 
 -- Add project_id to existing tables

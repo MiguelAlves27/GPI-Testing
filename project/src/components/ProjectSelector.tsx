@@ -1,141 +1,133 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronDown, Plus, Edit3, Trash2, AlertCircle } from 'lucide-react';
-import { format } from 'date-fns';
-import { createClient } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase'; // Import Supabase client
-
-//const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+import React, { useState } from 'react';
+import { ChevronDown, Plus, Trash2, Edit3 } from 'lucide-react';
+import { useProject, Project } from '../context/ProjectContext';
 
 const ProjectSelector = () => {
-  const [projects, setProjects] = useState([]);
-  const [currentProject, setCurrentProject] = useState(null);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState(null);
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    startDate: format(new Date(), 'yyyy-MM-dd'),
-    estimatedDuration: 12,
-    sprintDuration: 2,
-    status: 'Active'
-  });
+  const { 
+    currentProject, 
+    projects, 
+    loading,
+    createProject,
+    updateProject,
+    deleteProject,
+    setCurrentProject 
+  } = useProject();
 
-  useEffect(() => {
-    fetchProjects();
-  }, []);
+  const [isOpen, setIsOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [projectName, setProjectName] = useState('');
+  const [projectDescription, setProjectDescription] = useState('');
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
 
-    const fetchProjects = async () => {
-      const { data, error } = await supabase.from('projects').select('*');
-      if (error) console.error('Error fetching tasks:', error);
-      else setProjects(data || []);
-    };
+  const handleCreateProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await createProject(projectName, projectDescription);
+      setProjectName('');
+      setProjectDescription('');
+      setIsCreateModalOpen(false);
+    } catch (error) {
+      console.error('Failed to create project:', error);
+    }
+  };
 
-  const handleOpenModal = (project) => {
-    if (project) {
-      setEditingProject(project);
-      setFormData({
-        title: project.title,
-        description: project.description,
-        startDate: project.startDate,
-        estimatedDuration: project.estimatedDuration,
-        sprintDuration: project.sprintDuration,
-        status: project.status
-      });
-    } else {
+  const handleUpdateProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProject) return;
+
+    try {
+      await updateProject(editingProject.id, projectName, projectDescription);
+      setProjectName('');
+      setProjectDescription('');
+      setIsEditModalOpen(false);
       setEditingProject(null);
-      setFormData({
-        title: '',
-        description: '',
-        startDate: format(new Date(), 'yyyy-MM-dd'),
-        estimatedDuration: 12,
-        sprintDuration: 2,
-        status: 'Active'
-      });
+    } catch (error) {
+      console.error('Failed to update project:', error);
     }
-    setIsModalOpen(true);
-    setIsDropdownOpen(false);
   };
 
-  const handleSubmit = async () => {
-    if (editingProject) {
-      await supabase.from('projects').update(formData).eq('id', editingProject.id);
-    } else {
-      await supabase.from('projects').insert([formData]);
+  const handleDeleteProject = async (project: Project) => {
+    if (!window.confirm(`Are you sure you want to delete "${project.name}"? This action cannot be undone.`)) {
+      return;
     }
-    setIsModalOpen(false);
-    fetchProjects();
+
+    try {
+      await deleteProject(project.id);
+      setIsOpen(false);
+    } catch (error) {
+      console.error('Failed to delete project:', error);
+    }
   };
 
-  const handleDeleteProject = async () => {
-    if (editingProject) {
-      await supabase.from('projects').delete().eq('id', editingProject.id);
-      setIsDeleteConfirmOpen(false);
-      setIsModalOpen(false);
-      fetchProjects();
-    }
+  const openEditModal = (project: Project) => {
+    setEditingProject(project);
+    setProjectName(project.name);
+    setProjectDescription(project.description || '');
+    setIsEditModalOpen(true);
+    setIsOpen(false);
   };
+
+  if (loading) {
+    return (
+      <div className="h-10 w-48 bg-gray-100 animate-pulse rounded-lg"></div>
+    );
+  }
 
   return (
-    <>
     <div className="relative">
       <button
-        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-        className="flex items-center space-x-2 px-4 py-2 bg-white rounded-lg border border-gray-200 hover:bg-gray-50"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center space-x-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
       >
-        <div className="flex flex-col items-start">
-          <span className="text-xs text-gray-500">Current Project</span>
-          <span className="font-medium">{currentProject?.title || 'Select Project'}</span>
-        </div>
-        <ChevronDown size={16} className="text-gray-500" />
+        <span className="font-medium truncate max-w-[200px]">
+          {currentProject?.name || 'Select Project'}
+        </span>
+        <ChevronDown size={16} />
       </button>
 
-      {isDropdownOpen && (
-        <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+      {isOpen && (
+        <div className="absolute z-10 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200">
           <div className="p-2">
             <button
-              onClick={() => handleOpenModal()}
-              className="w-full flex items-center px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 rounded"
+              onClick={() => {
+                setIsOpen(false);
+                setIsCreateModalOpen(true);
+              }}
+              className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
             >
               <Plus size={16} className="mr-2" />
               Create New Project
             </button>
           </div>
+          
           <div className="border-t border-gray-200">
-            {projects.map(project => (
+            {projects.map((project) => (
               <div
                 key={project.id}
-                className="p-2 hover:bg-gray-50 flex items-center justify-between group"
+                className="flex items-center justify-between px-4 py-2 hover:bg-gray-50"
               >
                 <button
                   onClick={() => {
-                    setCurrentProject(project.id);
-                    setIsDropdownOpen(false);
+                    setCurrentProject(project);
+                    setIsOpen(false);
                   }}
-                  className="flex-1 flex items-center text-left px-2"
+                  className="flex-1 text-left text-sm text-gray-700 hover:text-gray-900"
                 >
-                  <div>
-                    <div className="font-medium text-gray-900">{project.title}</div>
-                    <div className="text-sm text-gray-500 truncate max-w-[180px]">
-                      {project.description}
-                    </div>
-                    <div className="mt-1">
-                      <span className={`text-xs px-2 py-1 rounded-full ${getProjectStatusColor(project.status)}`}>
-                        {project.status}
-                      </span>
-                    </div>
-                  </div>
+                  {project.name}
                 </button>
-                <div className="opacity-0 group-hover:opacity-100 flex items-center px-2">
+                <div className="flex items-center space-x-2">
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenModal(project);
-                    }}
+                    onClick={() => openEditModal(project)}
                     className="p-1 text-gray-400 hover:text-gray-600"
                   >
-                    <Edit3 size={16} />
+                    <Edit3 size={14} />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteProject(project)}
+                    className="p-1 text-gray-400 hover:text-red-600"
+                  >
+                    <Trash2 size={14} />
                   </button>
                 </div>
               </div>
@@ -143,148 +135,113 @@ const ProjectSelector = () => {
           </div>
         </div>
       )}
-    </div>
 
-    {/* Create/Edit Project Modal */}
-    {isModalOpen && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-          <div className="p-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">
-              {editingProject ? 'Edit Project' : 'Create New Project'}
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Project Title</label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Enter project title"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Enter project description"
-                ></textarea>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                <input
-                  type="date"
-                  value={formData.startDate}
-                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+      {/* Create Project Modal */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <form onSubmit={handleCreateProject} className="p-6">
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">Create New Project</h2>
+              <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Estimated Duration (weeks)
+                    Project Name
                   </label>
                   <input
-                    type="number"
-                    value={formData.estimatedDuration}
-                    onChange={(e) => setFormData({ ...formData, estimatedDuration: parseInt(e.target.value) })}
-                    min="1"
+                    type="text"
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    required
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Sprint Duration (weeks)
+                    Description (Optional)
                   </label>
-                  <input
-                    type="number"
-                    value={formData.sprintDuration}
-                    onChange={(e) => setFormData({ ...formData, sprintDuration: parseInt(e.target.value) })}
-                    min="1"
+                  <textarea
+                    value={projectDescription}
+                    onChange={(e) => setProjectDescription(e.target.value)}
+                    rows={3}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                  />
+                  ></textarea>
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as Project['status'] })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                >
-                  <option value="Active">Active</option>
-                  <option value="Completed">Completed</option>
-                  <option value="On Hold">On Hold</option>
-                </select>
-              </div>
-            </div>
-            <div className="mt-6 flex justify-between">
-              <div>
-                {editingProject && (
-                  <button
-                    onClick={() => setIsDeleteConfirmOpen(true)}
-                    className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-                  >
-                    Delete Project
-                  </button>
-                )}
-              </div>
-              <div className="flex space-x-3">
+              <div className="mt-6 flex justify-end space-x-3">
                 <button
-                  onClick={() => setIsModalOpen(false)}
+                  type="button"
+                  onClick={() => setIsCreateModalOpen(false)}
                   className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={handleSubmit}
+                  type="submit"
                   className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
                 >
-                  {editingProject ? 'Update Project' : 'Create Project'}
+                  Create Project
                 </button>
               </div>
-            </div>
+            </form>
           </div>
         </div>
-      </div>
-    )}
+      )}
 
-    {/* Delete Confirmation Modal */}
-    {isDeleteConfirmOpen && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
-          <div className="p-6">
-            <div className="flex items-center mb-4">
-              <AlertCircle size={24} className="text-red-600 mr-2" />
-              <h2 className="text-xl font-semibold text-gray-800">Delete Project</h2>
-            </div>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to delete this project? This action cannot be undone and will remove all associated tasks, stories, and sprints.
-            </p>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => setIsDeleteConfirmOpen(false)}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteProject}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-              >
-                Delete Project
-              </button>
-            </div>
+      {/* Edit Project Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <form onSubmit={handleUpdateProject} className="p-6">
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">Edit Project</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Project Name
+                  </label>
+                  <input
+                    type="text"
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Description (Optional)
+                  </label>
+                  <textarea
+                    value={projectDescription}
+                    onChange={(e) => setProjectDescription(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  ></textarea>
+                </div>
+              </div>
+              <div className="mt-6 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    setEditingProject(null);
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                >
+                  Update Project
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-      </div>
-    )}
-  </>
-);
+      )}
+    </div>
+  );
 };
 
 export default ProjectSelector;
